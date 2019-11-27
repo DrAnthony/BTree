@@ -5,8 +5,8 @@
 #endif // !NULL
 #include <cstdlib>
 #include <iostream>
-enum _BOOL_VALUE {FALSE,TRUE};
-enum _CMP {BIGGER,EQUAL,SMALLER};
+enum _BOOL_VALUE { FALSE, TRUE };
+enum _CMP { BIGGER, EQUAL, SMALLER };
 typedef short BOOL;
 
 template <typename ElementType>
@@ -14,7 +14,7 @@ struct KeyNode;
 
 template <typename ElementType>
 struct TreeNode {
-  int size=0;
+  int size = 0;
   KeyNode<ElementType>* key = NULL;
   TreeNode<ElementType>* next = NULL;
   TreeNode<ElementType>* child = NULL;
@@ -25,7 +25,7 @@ template <typename ElementType>
 struct KeyNode {
   ElementType value;
   TreeNode<ElementType>* p = NULL;
-  KeyNode<ElementType>* next=NULL;
+  KeyNode<ElementType>* next = NULL;
 };
 
 template <typename ElementType>
@@ -126,13 +126,13 @@ KeyNode<ElementType>* BTree<ElementType>::get(const ElementType& element) {
       else {
         k = k->next;
         h = h == NULL ? NULL : h->next;
-      }   
+      }
     }
   }
 }
 
 //将新节点插入到叶子节点，若成功插入返回TRUE，node不变，若已存在该节点，返回FALSE，
-//node更新为书中已存在的结点地址
+//node更新为树中已存在的结点地址
 template <typename ElementType>
 BOOL BTree<ElementType>::insert(KeyNode<ElementType>* node) {
   TreeNode<ElementType>* h = m_head->child;
@@ -163,7 +163,7 @@ BOOL BTree<ElementType>::insert(KeyNode<ElementType>* node) {
       delete node;
       node = NULL;
       m_size--;
-      node=k;
+      node = k;
       return FALSE;
     }
     else if (m_cmp(element, k->value) == SMALLER) {
@@ -202,13 +202,13 @@ template <typename ElementType>
 TreeNode<ElementType>* BTree<ElementType>::split(TreeNode<ElementType>* treeNode) {
   KeyNode<ElementType>* kn;//分裂出准备插入到父结点的KeyNode
   KeyNode<ElementType>* ktemp;//分裂出准备插入到父结点的KeyNode的前继结点，也做辅助key结点
-  TreeNode<ElementType>* newNode=new TreeNode<ElementType>;//分裂出的另一TreeNode
+  TreeNode<ElementType>* newNode = new TreeNode<ElementType>;//分裂出的另一TreeNode
   TreeNode<ElementType>* ttemp;//辅助TreeNode,标记老节点子链断开和新节点子链的开始
   BOOL isLeaf = treeNode->child == NULL;
   ktemp = treeNode->key;
   ttemp = treeNode->child;
   //找出分裂出的KeyNode和待分裂结点的分裂处
-  for (int i = 0; i < m_min-1; i++) {
+  for (int i = 0; i < m_min - 1; i++) {
     ktemp = ktemp->next;
     if (!isLeaf) {
       ttemp = ttemp->next;
@@ -219,7 +219,7 @@ TreeNode<ElementType>* BTree<ElementType>::split(TreeNode<ElementType>* treeNode
   if (!isLeaf) {
     ttemp = ttemp->next;
   }
-  
+
   //处理待分裂及分裂后结点的Key链及子链及size
   ktemp->next = NULL;
   ktemp = kn->next;
@@ -245,7 +245,7 @@ TreeNode<ElementType>* BTree<ElementType>::split(TreeNode<ElementType>* treeNode
   newNode->size = m_m - 1 - m_min;
 
   //将分裂出的key插入父结点
-  TreeNode<ElementType>* par=treeNode->parent;//父结点
+  TreeNode<ElementType>* par = treeNode->parent;//父结点
   //1.当前结点为根节点，则需要新建根节点
   if (par == NULL) {
     par = new TreeNode<ElementType>;
@@ -258,7 +258,7 @@ TreeNode<ElementType>* BTree<ElementType>::split(TreeNode<ElementType>* treeNode
     m_head = par;
     return m_head;
   }
-  
+
   //2.当前结点不为根节点
   kn->p = par;
   par->size++;
@@ -270,7 +270,7 @@ TreeNode<ElementType>* BTree<ElementType>::split(TreeNode<ElementType>* treeNode
     return par;
   }
   //2.2当前结点不为头结点
-  while (ktemp->next != NULL && m_cmp(ktemp->next->value,kn->value)==SMALLER) {
+  while (ktemp->next != NULL && m_cmp(ktemp->next->value, kn->value) == SMALLER) {
     ktemp = ktemp->next;
   }
   kn->next = ktemp->next;
@@ -288,11 +288,7 @@ KeyNode<ElementType>* BTree<ElementType>::put(ElementType element) {
     return node;
   }
   TreeNode<ElementType>* s = node->p;//当前结点
-  //TreeNode<ElementType>* sp;//当前结点父结点
-  //TreeNode<ElementType>* temp;//分裂后的新节点
-  //KeyNode<ElementType>* kt;//取出的值结点
-  //TreeNode<ElementType>* tt;//需要断开的子节点
-  //
+
   while (1) {
     if (s->size < m_m) {
       break;
@@ -348,20 +344,20 @@ void BTree<ElementType>::remove(const ElementType element) {
   rt->size--;
   delete kn;
   kn = NULL;
-  
+
   /*
   lbro:左兄弟 rbro：右兄弟 rtp:父结点
   */
   TreeNode<ElementType>* lbro, * rbro, * rtp;
   TreeNode<ElementType>* lchild, * rchild;
-  KeyNode<ElementType>* kpre=NULL;
+  KeyNode<ElementType>* kpre = NULL;
   TreeNode<ElementType>* tt;
   while (1) {
     //当前结点长度符合要求
     if (rt->size >= min) {
       return;
-    } 
-    
+    }
+
     //当前结点为头节点
     if (rt == m_head) {
       //头节点空，替换头节点
@@ -406,7 +402,7 @@ void BTree<ElementType>::remove(const ElementType element) {
             kpre = kpre->next;
           }
           kpre->next = ktemp;
-        }    
+        }
         ktemp->p = rt;
       }
       else {
@@ -429,7 +425,7 @@ void BTree<ElementType>::remove(const ElementType element) {
             kpre = kpre->next;
           }
           kpre->next = ktemp;
-        }  
+        }
         ktemp->p = rt;
         ktemp->next = NULL;
       }
@@ -517,7 +513,7 @@ void BTree<ElementType>::remove(const ElementType element) {
       if (tt == l) {
         ktemp = rtp->key;
         rtp->key = ktemp->next;
-        l->size=l->size+ 1 + r->size;
+        l->size = l->size + 1 + r->size;
         l->next = r->next;
         ktemp->p = l;
         kpre = l->key;
@@ -531,7 +527,7 @@ void BTree<ElementType>::remove(const ElementType element) {
         }
         else {
           l->key = ktemp;
-          ktemp->next= r->key;
+          ktemp->next = r->key;
           ktemp = ktemp->next;
         }
         while (ktemp != NULL) {
@@ -539,7 +535,7 @@ void BTree<ElementType>::remove(const ElementType element) {
           ktemp = ktemp->next;
         }
         if (lchild != NULL) {
-          while (lchild->next!=NULL)
+          while (lchild->next != NULL)
           {
             lchild = lchild->next;
           }
@@ -561,7 +557,7 @@ void BTree<ElementType>::remove(const ElementType element) {
         ktemp = kpre->next;
         kpre->next = ktemp->next;
         kpre = l->key;
-        l->size =l->size+ 1 + r->size;
+        l->size = l->size + 1 + r->size;
         l->next = r->next;
         ktemp->p = l;
         if (kpre == NULL) {
@@ -575,7 +571,7 @@ void BTree<ElementType>::remove(const ElementType element) {
           kpre->next = ktemp;
           ktemp->next = r->key;
           ktemp = ktemp->next;
-        }    
+        }
         while (ktemp != NULL) {
           ktemp->p = l;
           ktemp = ktemp->next;
@@ -599,7 +595,7 @@ void BTree<ElementType>::remove(const ElementType element) {
       r = NULL;
       rt = rtp;
     }
-  } 
+  }
 }
 #endif // !_BTREE_
 
