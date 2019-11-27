@@ -1,10 +1,10 @@
 #ifndef _BTREE_
 #define _BTREE_
+#include <cstdlib>
+#include <iostream>
 #ifndef NULL
 #define NULL 0
 #endif // !NULL
-#include <cstdlib>
-#include <iostream>
 enum _BOOL_VALUE { FALSE, TRUE };
 enum _CMP { BIGGER, EQUAL, SMALLER };
 typedef short BOOL;
