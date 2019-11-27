@@ -39,7 +39,8 @@ int main() {
     10004,10005,10006,10007
   };
   int len = sizeof(map)/sizeof(int);
-  BTree<int> tree(6, &cmp);
+  BTree<int> tree;
+  tree.init(2, &cmp);
   for (int i = 0; i < len; i++) {
     tree.put(map[i]);
   }

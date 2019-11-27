@@ -3,6 +3,8 @@
 #ifndef NULL
 #define NULL 0
 #endif // !NULL
+#include <cstdlib>
+#include <iostream>
 enum _BOOL_VALUE {FALSE,TRUE};
 enum _CMP {BIGGER,EQUAL,SMALLER};
 typedef short BOOL;
@@ -33,12 +35,14 @@ private:
   _CMP(*m_cmp)(const ElementType&, const ElementType&);//比较函数
   TreeNode<ElementType>* m_head;
   int m_size;
-  TreeNode<ElementType>* m_nil;
+  int m_min;
   void freeNode(TreeNode<ElementType>*);
   BOOL insert(KeyNode<ElementType>*);
+  TreeNode<ElementType>* split(TreeNode<ElementType>*);
 public:
-  BTree(int,_CMP(*_cmp)(const ElementType& e1,const ElementType& e2));
+  BTree() :m_size(0), m_head(new TreeNode<ElementType>) {};
   ~BTree();
+  void init(int, _CMP(*_cmp)(const ElementType& e1, const ElementType& e2));
   TreeNode<ElementType>* getHead();
   KeyNode<ElementType>* get(const ElementType&);
   KeyNode<ElementType>* put(ElementType);
@@ -48,12 +52,15 @@ public:
 };
 
 template <typename ElementType>
-BTree<ElementType>::BTree(int _m, _CMP(*_cmp)(const ElementType& e1, const ElementType& e2)) {
-  m_m = _m;
+void BTree<ElementType>::init(int _m, _CMP(*_cmp)(const ElementType& e1, const ElementType& e2)) {
+  if (_m <= 2) {
+    std::cout << "参数_m不能小于2" << std::endl;
+    destory();
+    exit(EXIT_FAILURE);
+  }
   m_cmp = _cmp;
-  m_size = 0;
-  m_nil = NULL;
-  m_head = new TreeNode<ElementType>;
+  m_m = _m;
+  m_min = m_m % 2 == 0 ? m_m / 2 - 1 : m_m / 2;
 }
 template <typename ElementType>
 BTree<ElementType>::~BTree() {
@@ -90,6 +97,7 @@ void BTree<ElementType>::destory() {
 template <typename ElementType>
 TreeNode<ElementType>* BTree<ElementType>::getHead() {
   return m_head;
+
 }
 template <typename ElementType>
 KeyNode<ElementType>* BTree<ElementType>::get(const ElementType& element) {
@@ -122,6 +130,7 @@ KeyNode<ElementType>* BTree<ElementType>::get(const ElementType& element) {
     }
   }
 }
+
 //将新节点插入到叶子节点，若成功插入返回TRUE，node不变，若已存在该节点，返回FALSE，
 //node更新为书中已存在的结点地址
 template <typename ElementType>
@@ -187,102 +196,108 @@ BOOL BTree<ElementType>::insert(KeyNode<ElementType>* node) {
   }
   return TRUE;
 }
+
+//分裂操作，将size>m-1结点分裂，并插入到父结点，返回父结点
+template <typename ElementType>
+TreeNode<ElementType>* BTree<ElementType>::split(TreeNode<ElementType>* treeNode) {
+  KeyNode<ElementType>* kn;//分裂出准备插入到父结点的KeyNode
+  KeyNode<ElementType>* ktemp;//分裂出准备插入到父结点的KeyNode的前继结点，也做辅助key结点
+  TreeNode<ElementType>* newNode=new TreeNode<ElementType>;//分裂出的另一TreeNode
+  TreeNode<ElementType>* ttemp;//辅助TreeNode,标记老节点子链断开和新节点子链的开始
+  BOOL isLeaf = treeNode->child == NULL;
+  ktemp = treeNode->key;
+  ttemp = treeNode->child;
+  //找出分裂出的KeyNode和待分裂结点的分裂处
+  for (int i = 0; i < m_min-1; i++) {
+    ktemp = ktemp->next;
+    if (!isLeaf) {
+      ttemp = ttemp->next;
+    }
+  }
+  kn = ktemp->next;
+  //子链比keyNode链长1,故需要后移一位
+  if (!isLeaf) {
+    ttemp = ttemp->next;
+  }
+  
+  //处理待分裂及分裂后结点的Key链及子链及size
+  ktemp->next = NULL;
+  ktemp = kn->next;
+  kn->next = NULL;
+  newNode->key = ktemp;
+  while (ktemp != NULL) {
+    ktemp->p = newNode;
+    ktemp = ktemp->next;
+  }
+  if (!isLeaf) {
+    newNode->child = ttemp->next;
+    ttemp->next = NULL;
+    ttemp = newNode->child;
+    while (ttemp != NULL) {
+      ttemp->parent = newNode;
+      ttemp = ttemp->next;
+    }
+  }
+  newNode->next = treeNode->next;
+  newNode->parent = treeNode->parent;
+  treeNode->next = newNode;
+  treeNode->size = m_min;
+  newNode->size = m_m - 1 - m_min;
+
+  //将分裂出的key插入父结点
+  TreeNode<ElementType>* par=treeNode->parent;//父结点
+  //1.当前结点为根节点，则需要新建根节点
+  if (par == NULL) {
+    par = new TreeNode<ElementType>;
+    par->size++;
+    par->child = treeNode;
+    treeNode->parent = par;
+    newNode->parent = par;
+    par->key = kn;
+    kn->p = par;
+    m_head = par;
+    return m_head;
+  }
+  
+  //2.当前结点不为根节点
+  kn->p = par;
+  par->size++;
+  ktemp = par->key;
+  //2.1若当前结点为父结点的头节点，将key插入到头部
+  if (treeNode == par->child) {
+    kn->next = ktemp;
+    par->key = kn;
+    return par;
+  }
+  //2.2当前结点不为头结点
+  while (ktemp->next != NULL && m_cmp(ktemp->next->value,kn->value)==SMALLER) {
+    ktemp = ktemp->next;
+  }
+  kn->next = ktemp->next;
+  ktemp->next = kn;
+  return par;
+}
+
 template <typename ElementType>
 KeyNode<ElementType>* BTree<ElementType>::put(ElementType element) {
   m_size++;
   KeyNode<ElementType>* node = new KeyNode<ElementType>;
   node->value = element;
   if (!insert(node)) {
+    m_size--;
     return node;
   }
   TreeNode<ElementType>* s = node->p;//当前结点
-  TreeNode<ElementType>* sp;//当前结点父结点
-  TreeNode<ElementType>* temp;//分裂后的新节点
-  KeyNode<ElementType>* kt;//取出的值结点
-  TreeNode<ElementType>* tt;//需要断开的子节点
+  //TreeNode<ElementType>* sp;//当前结点父结点
+  //TreeNode<ElementType>* temp;//分裂后的新节点
+  //KeyNode<ElementType>* kt;//取出的值结点
+  //TreeNode<ElementType>* tt;//需要断开的子节点
+  //
   while (1) {
-    //关键字数小于m
     if (s->size < m_m) {
       break;
     }
-    //关键字数超过m-1,分裂操作
-    sp = s->parent;
-    temp = new TreeNode<ElementType>;
-    temp->parent = sp;
-    int mid = s->size / 2;
-    kt = s->key;
-    tt = s->child;
-    for (int i = 1; i < mid; i++) {
-      kt = kt->next;
-      if (tt != NULL) {
-        tt = tt->next;
-      }
-    }
-    if (tt != NULL) {
-      tt = tt->next;
-      temp->child = tt->next;
-      tt->next = NULL;
-      TreeNode<ElementType>* t = temp->child;
-      while (t != NULL) {
-        t->parent = temp;
-        t = t->next;
-      }
-    }
-    KeyNode<ElementType>* k = kt;
-    kt = k->next;
-    k->next = NULL;
-    k = kt->next;
-    temp->key = k;
-    while (k != NULL) {
-      k->p = temp;
-      k = k->next;
-    }
-    kt->next = NULL;
-    kt->p = sp;
-    //将分裂出的新结点插入到父节点的孩子链表
-    temp->next = s->next;
-    temp->size = m_m - 1 - mid;
-    s->next = temp;
-    s->size = mid;
-    KeyNode<ElementType>* kpre=NULL;
-    //如果当前结点为根节点
-    if (sp == NULL) {
-      TreeNode<ElementType>* newhead = new TreeNode<ElementType>;
-      newhead->size = 1;
-      newhead->key = kt;
-      kt->p = newhead;
-      newhead->child = s;
-      while (s != NULL) {
-        s->parent = newhead;
-        s = s->next;
-      }
-      m_head = newhead;
-      break;
-    }
-    //将分类出的key插入到父节点的Key链表
-    k = sp->key;
-    while (1) {
-      if (k == NULL) {
-        kpre->next = kt;
-        break;
-      }
-      if (m_cmp(kt->value, k->value) == SMALLER) {
-        kt->next = k;
-        if (kpre == NULL) {
-          sp->key = kt;
-        }
-        else {
-          kpre->next = kt;
-        }
-        break;
-      }
-      else {
-        kpre = k;
-        k = k->next;
-      }
-    }
-    sp->size++;
-    s = sp;
+    s = split(s);
   }
   return node;
 }
