@@ -39,6 +39,11 @@ private:
   void freeNode(TreeNode<ElementType>*);
   BOOL insert(KeyNode<ElementType>*);
   TreeNode<ElementType>* split(TreeNode<ElementType>*);
+  void getBros(const TreeNode<ElementType>* self, TreeNode<ElementType>** left, TreeNode<ElementType>** right);
+  KeyNode<ElementType>* getParKeyNode(TreeNode<ElementType>* left);
+  void borrowFromRight(TreeNode<ElementType>* self, TreeNode<ElementType>* right);
+  void borrowFromLeft(TreeNode<ElementType>* self, TreeNode<ElementType>* left);
+  TreeNode<ElementType>* combine(TreeNode<ElementType>* left, TreeNode<ElementType>* right);
 public:
   BTree() :m_size(0), m_head(new TreeNode<ElementType>) {};
   ~BTree();
@@ -139,24 +144,25 @@ BOOL BTree<ElementType>::insert(KeyNode<ElementType>* node) {
   KeyNode<ElementType>* k = m_head->key;
   KeyNode<ElementType>* kpre = NULL;
   ElementType element = node->value;
+  BOOL isLeaf;
   node->p = m_head;
   while (1) {
-    if (k == NULL) {
-      if (h == NULL) {
-        if (kpre != NULL) {
-          kpre->next = node;
-        }
-        else {
-          node->p->key = node;
-        }
-        node->next = k;
-        node->p->size++;
-        break;
+    isLeaf = (h == NULL) ? TRUE : FALSE;
+    if (isLeaf && k == NULL) {
+      if (kpre != NULL) {
+        kpre->next = node;
       }
+      else {
+        node->p->key = node;
+      }
+      break;
+    }
+    if (k == NULL) {
       k = h->key;
-      kpre = NULL;
       node->p = h;
       h = h->child;
+      kpre = NULL;
+      isLeaf = (h == NULL) ? TRUE : FALSE;
     }
     if (m_cmp(element, k->value) == EQUAL) {
       k->value = node->value;
@@ -167,16 +173,14 @@ BOOL BTree<ElementType>::insert(KeyNode<ElementType>* node) {
       return FALSE;
     }
     else if (m_cmp(element, k->value) == SMALLER) {
-      if (h == NULL) {
-        node->p = k->p;
-        if (kpre != NULL) {
-          kpre->next = node;
+      if (isLeaf) {
+        node->next = k;
+        if (kpre == NULL) {
+          node->p->key = node;
         }
         else {
-          k->p->key = node;
+          kpre->next = node;
         }
-        node->next = k;
-        node->p->size++;
         break;
       }
       else {
@@ -187,13 +191,14 @@ BOOL BTree<ElementType>::insert(KeyNode<ElementType>* node) {
       }
     }
     else {
-      if (h != NULL) {
+      if (!isLeaf) {
         h = h->next;
       }
       kpre = k;
       k = k->next;
     }
   }
+  node->p->size++;
   return TRUE;
 }
 
@@ -297,6 +302,162 @@ KeyNode<ElementType>* BTree<ElementType>::put(ElementType element) {
   }
   return node;
 }
+
+template <typename ElementType>
+void BTree<ElementType>::getBros(const TreeNode<ElementType>* self, TreeNode<ElementType>** left, TreeNode<ElementType>** right) {
+  *left = NULL;
+  *right = NULL;
+  //the head node has no bro
+  if (self == m_head) {
+    return;
+  }
+  *right = self->next;
+  TreeNode<ElementType>* p = self->parent;
+  //the self node is the first child of the p node,no left bro
+  if (p->child == self) {
+    return;
+  }
+  TreeNode<ElementType>* pre = p->child;
+  while (pre->next != self) {
+    pre = pre->next;
+  }
+  *left = pre;
+}
+template <typename ElementType>
+KeyNode<ElementType>* BTree<ElementType>::getParKeyNode(TreeNode<ElementType>* left) {
+  if (left == m_head) {
+    return NULL;
+  }
+  TreeNode<ElementType>* p = left->parent;
+  TreeNode<ElementType>* temp = p->child;
+  KeyNode<ElementType>* ktemp = p->key;
+  while (temp != left) {
+    temp = temp->next;
+    ktemp = ktemp->next;
+  }
+  return ktemp;
+}
+template <typename ElementType>
+void BTree<ElementType>::borrowFromRight(TreeNode<ElementType>* self, TreeNode<ElementType>* right) {
+  TreeNode<ElementType>* p = self->parent;
+  KeyNode<ElementType>* pk;
+  pk = getParKeyNode(self);
+  KeyNode<ElementType>* temp = new KeyNode<ElementType>;
+  temp->value = pk->value;
+  temp->p = self;
+  pk->value = right->key->value;
+  if (self->size == 0) {
+    self->key = temp;
+  }
+  else {
+    pk = self->key;
+    while (pk->next != NULL) {
+      pk = pk->next;
+    }
+    pk->next = temp;
+  }
+  temp = right->key;
+  right->key = temp->next;
+  delete temp; temp = NULL;
+  if (self->child != NULL) {
+    p = self->child;
+    while (p->next != NULL) {
+      p = p->next;
+    }
+    p->next = right->child;
+    right->child = right->child->next;
+    p->next->parent = self;
+  }
+  self->size++;
+  right->size--;
+}
+template <typename ElementType>
+void BTree<ElementType>::borrowFromLeft(TreeNode<ElementType>* self, TreeNode<ElementType>* left) {
+  TreeNode<ElementType>* p = self->parent;
+  KeyNode<ElementType>* pk;
+  pk = getParKeyNode(left);
+  KeyNode<ElementType>* temp = new KeyNode<ElementType>;
+  KeyNode<ElementType>* kpre = NULL;
+  temp->value = pk->value;
+  temp->p = self;
+  temp->next = self->key;
+  self->key = temp;
+  temp = left->key;
+  while (temp->next != NULL) {
+    kpre = temp;
+    temp = temp->next;
+  }
+  pk->value = temp->value;
+  kpre->next = NULL;
+  delete temp;
+  temp = NULL;
+  TreeNode<ElementType>* tpre = NULL;
+  if (left->child != NULL) {
+    p = left->child;
+    while (p->next != NULL) {
+      tpre = p;
+      p = p->next;
+    }
+    tpre->next = NULL;
+    p->next = self->child->next;
+    self->child = p;
+    p->parent = self;
+  }
+  self->size++;
+  left->size--;
+}
+//将左节点右节点和父结点对于的key值合并
+template <typename ElementType>
+TreeNode<ElementType>* BTree<ElementType>::combine(TreeNode<ElementType>* left, TreeNode<ElementType>* right) {
+  KeyNode<ElementType>* pk = getParKeyNode(left);
+  KeyNode<ElementType>* ktemp = left->parent->key;
+  //连接父结点断开的key值
+  if (pk == ktemp) {
+    left->parent->key = pk->next;
+  }
+  else {
+    while (ktemp->next != pk) {
+      ktemp = ktemp->next;
+    }
+    ktemp->next = pk->next;
+  }
+  pk->next = NULL;
+  left->next = right->next;
+  left->size = left->size + right->size + 1;
+  ktemp = left->key;
+  //连接两结点及父结点key值列表
+  if (ktemp == NULL) {
+    left->key = pk;
+  }
+  else {
+    while (ktemp->next != NULL) {
+      ktemp = ktemp->next;
+    }
+    ktemp->next = pk;
+  }
+  pk->next = right->key;
+  while (pk != NULL) {
+    pk->p = left;
+    pk = pk->next;
+  }
+  //连接两结点child
+  if (left->child != NULL) {
+    TreeNode<ElementType>* ttemp = left->child;
+    while (ttemp->next != NULL) {
+      ttemp = ttemp->next;
+    }
+    ttemp->next = right->child;
+    ttemp = ttemp->next;
+    while (ttemp != NULL) {
+      ttemp->parent = left;
+      ttemp = ttemp->next;
+    }
+  }
+  delete right;
+  right = NULL;
+  left->parent->size--;
+  return left->parent;
+}
 template <typename ElementType>
 void BTree<ElementType>::remove(const ElementType element) {
   m_size--;
@@ -305,13 +466,6 @@ void BTree<ElementType>::remove(const ElementType element) {
   if (kn == NULL) {
     m_size++;
     return;
-  }
-  int min;
-  if (m_m % 2 == 0) {
-    min = m_m / 2 - 1;
-  }
-  else {
-    min = m_m / 2;
   }
   //找到替代节点，直接后继
   TreeNode<ElementType>* rt = kn->p;;
@@ -346,18 +500,13 @@ void BTree<ElementType>::remove(const ElementType element) {
   kn = NULL;
 
   /*
-  lbro:左兄弟 rbro：右兄弟 rtp:父结点
+  lbro:左兄弟 rbro：右兄弟
   */
-  TreeNode<ElementType>* lbro, * rbro, * rtp;
-  TreeNode<ElementType>* lchild, * rchild;
-  KeyNode<ElementType>* kpre = NULL;
-  TreeNode<ElementType>* tt;
+  TreeNode<ElementType>* lbro, * rbro;
   while (1) {
-    //当前结点长度符合要求
-    if (rt->size >= min) {
-      return;
+    if (rt->size >= m_min) {
+      break;
     }
-
     //当前结点为头节点
     if (rt == m_head) {
       //头节点空，替换头节点
@@ -366,234 +515,23 @@ void BTree<ElementType>::remove(const ElementType element) {
         delete rt;
         rt = NULL;
       }
-      return;
+      break;
     }
-    rtp = rt->parent;
-    tt = rtp->child;
-    rbro = rt->next;
-    lbro = rtp->child;
-    //找到兄弟结点
-    if (lbro == rt) {
-      lbro = NULL;
+    lbro = NULL; rbro = NULL;
+    getBros(rt, &lbro, &rbro);
+    if (rbro != NULL && rbro->size > m_min) {
+      borrowFromRight(rt, rbro);
+      break;
+    }
+    else if (lbro != NULL && lbro->size > m_min) {
+      borrowFromLeft(rt, lbro);
+      break;
+    }
+    else if(rbro!=NULL){
+      rt=combine(rt, rbro);
     }
     else {
-      while (lbro->next != rt) {
-        lbro = lbro->next;
-      }
-    }
-    kpre = NULL;
-    tt = rtp->child;
-    //右兄弟结点不为空且可以借
-    if (rbro != NULL && rbro->size > min) {
-      lchild = rt->child;
-      rchild = rbro->child;
-      if (tt == rt) {
-        ktemp = rtp->key;
-        rtp->key = rbro->key;
-        rtp->key->p = rtp;
-        rbro->key = rtp->key->next;
-        rtp->key->next = ktemp->next;
-        kpre = rt->key;
-        if (kpre == NULL) {
-          rt->key = ktemp;
-        }
-        else {
-          while (kpre->next != NULL) {
-            kpre = kpre->next;
-          }
-          kpre->next = ktemp;
-        }
-        ktemp->p = rt;
-      }
-      else {
-        kpre = rtp->key;
-        while (tt->next != rt) {
-          tt = tt->next;
-          kpre = kpre->next;
-        }
-        ktemp = kpre->next;
-        rbro->key->p = kpre->p;
-        kpre->next = rbro->key;
-        rbro->key = rbro->key->next;
-        kpre->next->next = ktemp->next;
-        kpre = rt->key;
-        if (kpre == NULL) {
-          rt->key = ktemp;
-        }
-        else {
-          while (kpre->next != NULL) {
-            kpre = kpre->next;
-          }
-          kpre->next = ktemp;
-        }
-        ktemp->p = rt;
-        ktemp->next = NULL;
-      }
-      if (lchild != NULL) {
-        while (lchild->next != NULL)
-        {
-          lchild = lchild->next;
-        }
-        lchild->next = rchild;
-        rbro->child = rchild->next;
-        rchild->next = NULL;
-        rchild->parent = rt;
-      }
-      rt->size++;
-      rbro->size--;
-      return;
-    }
-    //左兄弟结点不为空且可以借
-    else if (lbro != NULL && lbro->size > min) {
-      lchild = lbro->child;
-      rchild = rt->child;
-      if (tt == lbro) {
-        ktemp = lbro->key;
-        kpre = NULL;
-        while (ktemp->next != NULL) {
-          kpre = ktemp;
-          ktemp = ktemp->next;
-        }
-        kpre->next = NULL;
-        kpre = rtp->key;
-        rtp->key = ktemp;
-        ktemp->p = rtp;
-        ktemp->next = kpre->next;
-        kpre->p = rt;
-        kpre->next = rt->key;
-        rt->key = kpre;
-      }
-      else {
-        kpre = rtp->key;
-        while (tt->next != lbro) {
-          tt = tt->next;
-          kpre = kpre->next;
-        }
-        ktemp = kpre->next;
-        kpre->next = ktemp->next;
-        ktemp->p = rt;
-        ktemp->next = rt->key;
-        rt->key = ktemp;
-        ktemp = lbro->key;
-        KeyNode<ElementType>* kkt = NULL;
-        while (ktemp->next != NULL) {
-          kkt = ktemp;
-          ktemp = ktemp->next;
-        }
-        kkt->next = NULL;
-        ktemp->p = rtp;
-        ktemp->next = kpre->next;
-        kpre->next = ktemp;
-      }
-      if (lchild != NULL) {
-        while (lchild->next->next != NULL)
-        {
-          lchild = lchild->next;
-        }
-        lchild->next->next = rchild;
-        rt->child = lchild->next;
-        lchild->next->parent = rt;
-        lchild->next = NULL;
-      }
-      rt->size++;
-      lbro->size--;
-      return;
-    }
-    //不可借，两结点合并，对应的key值加入合并后的结点，父结点删除该key，将父结点作为当前结点继续向上调节
-    else {
-      TreeNode<ElementType>* l, * r;
-      if (rbro != NULL) {
-        l = rt; r = rbro;
-      }
-      else {
-        l = lbro; r = rt;
-      }
-      lchild = l->child;
-      rchild = r->child;
-      if (tt == l) {
-        ktemp = rtp->key;
-        rtp->key = ktemp->next;
-        l->size = l->size + 1 + r->size;
-        l->next = r->next;
-        ktemp->p = l;
-        kpre = l->key;
-        if (kpre != NULL) {
-          while (kpre->next != NULL) {
-            kpre = kpre->next;
-          }
-          kpre->next = ktemp;
-          ktemp->next = r->key;
-          ktemp = ktemp->next;
-        }
-        else {
-          l->key = ktemp;
-          ktemp->next = r->key;
-          ktemp = ktemp->next;
-        }
-        while (ktemp != NULL) {
-          ktemp->p = l;
-          ktemp = ktemp->next;
-        }
-        if (lchild != NULL) {
-          while (lchild->next != NULL)
-          {
-            lchild = lchild->next;
-          }
-          lchild->next = rchild;
-          lchild = lchild->next;
-          while (lchild != NULL)
-          {
-            lchild->parent = l;
-            lchild = lchild->next;
-          }
-        }
-      }
-      else {
-        kpre = rtp->key;
-        while (tt->next != l) {
-          tt = tt->next;
-          kpre = kpre->next;
-        }
-        ktemp = kpre->next;
-        kpre->next = ktemp->next;
-        kpre = l->key;
-        l->size = l->size + 1 + r->size;
-        l->next = r->next;
-        ktemp->p = l;
-        if (kpre == NULL) {
-          l->key = r->key;
-          ktemp = l->key;
-        }
-        else {
-          while (kpre->next != NULL) {
-            kpre = kpre->next;
-          }
-          kpre->next = ktemp;
-          ktemp->next = r->key;
-          ktemp = ktemp->next;
-        }
-        while (ktemp != NULL) {
-          ktemp->p = l;
-          ktemp = ktemp->next;
-        }
-        if (lchild != NULL) {
-          while (lchild->next != NULL)
-          {
-            lchild = lchild->next;
-          }
-          lchild->next = rchild;
-          lchild = lchild->next;
-          while (lchild != NULL)
-          {
-            lchild->parent = l;
-            lchild = lchild->next;
-          }
-        }
-      }
-      rtp->size--;
-      delete r;
-      r = NULL;
-      rt = rtp;
+      rt=combine(lbro, rt);
     }
   }
 }
