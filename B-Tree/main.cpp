@@ -30,13 +30,6 @@ void inorder(TreeNode<int>* h,int level) {
     child = child->next;
   }
 }
-
-void set(int** a) {
-  *a = new int[3];
-  (*a)[0] = 1;
-  (*a)[1] = 2;
-  (*a)[2] = 3;
-}
 int main() {
   int map[] = {
     5,6,1,4,5,14,52,17,84,100,26,58,95,47,
@@ -64,6 +57,5 @@ int main() {
   cout << "+++++++++++++++" << endl;
   tree.remove(789);
   inorder(tree.getHead(), 0);
-
   return 0;
 }
